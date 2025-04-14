@@ -1,9 +1,10 @@
 import tkinter as tk
+from tkinter import ttk
+from PIL import Image, ImageTk  
 import json
 import os
-import random
 
-# Función para cargar datos desde un archivo
+
 def cargar_datos(archivo):
     try:
         with open(archivo, "r", encoding="utf-8") as f:
@@ -24,114 +25,146 @@ class JuegoF1:
     def __init__(self, ventana):
         self.ventana = ventana
         self.ventana.title("Adivina el Piloto de F1")
-        self.ventana.geometry("600x400")
+        self.ventana.geometry("800x600")
         self.ventana.resizable(False, False)
+        self.style = ttk.Style()
+        self.style.theme_use("clam")
 
         self.datos = cargar_datos("f1_lista.json")
-        # Seleccionar las primeras 10 preguntas (manteniendo el orden original)
-        self.preguntas_random = self.datos["preguntas"][:10]
+        self.preguntas_random = self.datos["preguntas"][:16]
         self.pregunta_actual = 0
         self.respuestas = []
-        self.pilotos_filtrados = self.datos["f1"].copy()  # Inicialmente, todos los pilotos están disponibles
+        self.pilotos_filtrados = self.datos["f1"].copy()
 
+        # Crear un canvas para contener la imagen de fondo y los widgets
+        self.canvas = tk.Canvas(self.ventana, width=800, height=600, highlightthickness=0)
+        self.canvas.pack(fill="both", expand=True)
+        
+        # Intentar cargar la imagen de fondo usando Pillow (soporta JPEG)
+        try:
+            imagen = Image.open("fondo.jpg")
+            # Redimensionar la imagen para que se ajuste a la ventana utilizando Resampling.LANCZOS
+            imagen = imagen.resize((800, 600), Image.Resampling.LANCZOS)
+            self.fondo_img = ImageTk.PhotoImage(imagen)
+            self.canvas.create_image(0, 0, image=self.fondo_img, anchor="nw")
+        except Exception as e:
+            print("No se pudo cargar la imagen de fondo:", e)
+        
         self.crear_primera_pantalla()
 
-    def dibujar_bandera(self):
-        # Se crea un frame contenedor para la bandera, para que se dibuje primero
-        frame_fondo = tk.Frame(self.ventana)
-        frame_fondo.place(x=0, y=0, relwidth=1, relheight=1)
-        for i in range(20):
-            for j in range(20):
-                color = "white" if (i + j) % 2 == 0 else "black"
-                cuadro = tk.Frame(frame_fondo, bg=color, width=30, height=30)
-                cuadro.place(x=j * 30, y=i * 30)
-
     def crear_primera_pantalla(self):
-        # Dibujar la bandera a cuadros de fondo
-        self.dibujar_bandera()
-
-        # Elementos de la pantalla inicial
-        self.titulo = tk.Label(self.ventana, text="¡Adivina el Piloto de F1!", font=("Arial", 16, "bold"), bg="black", fg="white")
-        self.titulo.pack(pady=10)
-
-        self.etiqueta_inicio = tk.Label(self.ventana, text="Presiona 'Empezar' para iniciar el juego.", font=("Arial", 12), wraplength=500, bg="black", fg="white")
-        self.etiqueta_inicio.pack(pady=20)
-
-        self.boton_empezar = tk.Button(self.ventana, text="Empezar", command=self.mostrar_segunda_pantalla, bg="#4CAF50", fg="white", width=15, height=2, font=("Arial", 14, "bold"))
-        self.boton_empezar.pack(pady=10)
-
+        # Se crea un frame para agrupar los widgets de la pantalla de inicio
+        self.frame_inicio = tk.Frame(self.canvas, bg="#000000", bd=0)
+        self.frame_inicio.place(relx=0.5, rely=0.5, anchor="center")
+        
+        titulo = tk.Label(
+            self.frame_inicio,
+            text="¡Adivina el Piloto de F1!",
+            font=("Helvetica", 24, "bold"),
+            bg="#000000",
+            fg="#FFD700"
+        )
+        titulo.pack(pady=20)
+        
+        etiqueta_inicio = tk.Label(
+            self.frame_inicio,
+            text="Presiona 'Empezar' para iniciar el juego.",
+            font=("Helvetica", 16),
+            bg="#000000",
+            fg="white"
+        )
+        etiqueta_inicio.pack(pady=10)
+        
+        boton_empezar = ttk.Button(self.frame_inicio, text="Empezar", command=self.mostrar_segunda_pantalla)
+        boton_empezar.pack(pady=20)
+        
     def mostrar_segunda_pantalla(self):
-        # Limpiar la primera pantalla
-        for widget in self.ventana.winfo_children():
-            widget.destroy()
-        # Dibujar la bandera para la segunda pantalla
-        self.dibujar_bandera()
-
-        # Crear la pantalla de preguntas
+        # Se destruye la pantalla de inicio y se pasa a la pantalla de preguntas
+        self.frame_inicio.destroy()
         self.crear_interfaz_preguntas()
 
     def crear_interfaz_preguntas(self):
-        # Elementos de la pantalla de preguntas sobre el fondo de bandera
-        self.titulo = tk.Label(self.ventana, text="¡Responde las preguntas!", font=("Arial", 16, "bold"), bg="black", fg="white")
-        self.titulo.pack(pady=10)
+        self.frame_preguntas = tk.Frame(self.canvas, bg="#000000")
+        self.frame_preguntas.place(relx=0.5, rely=0.5, anchor="center")
+        
+        titulo = tk.Label(
+            self.frame_preguntas,
+            text="¡Responde las preguntas!",
+            font=("Helvetica", 20, "bold"),
+            bg="#000000",
+            fg="#FFD700"
+        )
+        titulo.pack(pady=10)
 
-        self.contenedor_pregunta = tk.Frame(self.ventana, bg="black")
-        self.contenedor_pregunta.pack(pady=20)
+        self.etiqueta_pregunta = tk.Label(
+            self.frame_preguntas,
+            text="",
+            font=("Helvetica", 16),
+            wraplength=700,
+            bg="#000000",
+            fg="white"
+        )
+        self.etiqueta_pregunta.pack(pady=20)
 
-        self.etiqueta_pregunta = tk.Label(self.contenedor_pregunta, text="", font=("Arial", 12), wraplength=500, bg="black", fg="white")
-        self.etiqueta_pregunta.pack()
+        botones_frame = tk.Frame(self.frame_preguntas, bg="#000000")
+        botones_frame.pack(pady=20)
 
-        self.boton_si = tk.Button(self.ventana, text="Sí", command=lambda: self.responder(1), bg="#4CAF50", fg="white", width=10, height=2, font=("Arial", 14, "bold"))
-        self.boton_no = tk.Button(self.ventana, text="No", command=lambda: self.responder(0), bg="#F44336", fg="white", width=10, height=2, font=("Arial", 14, "bold"))
-        self.boton_si.pack(side=tk.LEFT, padx=20, pady=10)
-        self.boton_no.pack(side=tk.RIGHT, padx=20, pady=10)
+        self.boton_si = ttk.Button(botones_frame, text="Sí", command=lambda: self.responder(1))
+        self.boton_no = ttk.Button(botones_frame, text="No", command=lambda: self.responder(0))
+        self.boton_si.grid(row=0, column=0, padx=30, ipadx=10, ipady=10)
+        self.boton_no.grid(row=0, column=1, padx=30, ipadx=10, ipady=10)
 
-        self.etiqueta_resultado = tk.Label(self.ventana, text="", font=("Arial", 13), fg="red", bg="black")
-        self.etiqueta_resultado.pack(pady=10)
+        self.etiqueta_resultado = tk.Label(
+            self.frame_preguntas,
+            text="",
+            font=("Helvetica", 14),
+            bg="#000000",
+            fg="#FF6347"
+        )
+        self.etiqueta_resultado.pack(pady=20)
 
         self.mostrar_pregunta()
 
     def mostrar_pregunta(self):
-        # Mostrar la siguiente pregunta
         if self.pregunta_actual < len(self.preguntas_random):
             self.etiqueta_pregunta.config(text=self.preguntas_random[self.pregunta_actual])
         else:
             self.finalizar_juego()
 
     def responder(self, respuesta):
-        # Guardar la respuesta del usuario
         self.respuestas.append(respuesta)
-
-        # Filtrar los pilotos según las respuestas dadas hasta ahora
         self.pilotos_filtrados = {
             piloto: respuestas for piloto, respuestas in self.pilotos_filtrados.items()
             if respuestas[:len(self.respuestas)] == self.respuestas
         }
-
-        # Continuar con las preguntas hasta llegar a la décima
         self.pregunta_actual += 1
         self.mostrar_pregunta()
 
     def finalizar_juego(self):
-        # Intentar identificar el piloto después de 10 preguntas
+        # Deshabilitar botones al finalizar
         self.boton_si.config(state="disabled")
         self.boton_no.config(state="disabled")
 
         if len(self.pilotos_filtrados) == 1:
             mensaje = f"¡Tu piloto es: {list(self.pilotos_filtrados.keys())[0]}!"
         elif len(self.pilotos_filtrados) > 1:
-            mensaje = f"No se pudo identificar con precisión. Los posibles pilotos son: {', '.join(self.pilotos_filtrados.keys())}."
+            posibles = ', '.join(self.pilotos_filtrados.keys())
+            mensaje = f"No se pudo identificar con precisión. Posibles pilotos: {posibles}."
         else:
             mensaje = "No se encontró coincidencia. Puedes agregar un nuevo piloto."
             self.pedir_nuevo_piloto()
+
         self.etiqueta_resultado.config(text=mensaje)
+        
+        # Agregar un botón de Reiniciar en la pantalla final
+        self.boton_reiniciar = ttk.Button(self.frame_preguntas, text="Reiniciar", command=self.reiniciar_juego)
+        self.boton_reiniciar.pack(pady=10)
 
     def pedir_nuevo_piloto(self):
         self.etiqueta_pregunta.config(text="¿Cuál era el piloto?")
-        self.entrada_piloto = tk.Entry(self.ventana)
-        self.entrada_piloto.pack(pady=5)
-
-        self.boton_guardar = tk.Button(self.ventana, text="Guardar", command=self.guardar_piloto, bg="#4CAF50", fg="white")
+        self.entrada_piloto = ttk.Entry(self.frame_preguntas, font=("Helvetica", 14))
+        self.entrada_piloto.pack(pady=10)
+        self.boton_guardar = ttk.Button(self.frame_preguntas, text="Guardar", command=self.guardar_piloto)
         self.boton_guardar.pack(pady=5)
 
     def guardar_piloto(self):
@@ -142,8 +175,16 @@ class JuegoF1:
             self.etiqueta_resultado.config(text=f"Piloto guardado: {nuevo_piloto}")
         self.entrada_piloto.destroy()
         self.boton_guardar.destroy()
+        
+    def reiniciar_juego(self):
+        # Destruir el frame de preguntas y restablecer variables para reiniciar el juego
+        self.frame_preguntas.destroy()
+        self.pregunta_actual = 0
+        self.respuestas = []
+        self.pilotos_filtrados = self.datos["f1"].copy()
+        # Volver a la pantalla de inicio
+        self.crear_primera_pantalla()
 
-# Función principal
 def main():
     ventana = tk.Tk()
     app = JuegoF1(ventana)
